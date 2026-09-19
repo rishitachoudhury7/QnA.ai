@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import {
   ArrowRight,
   BrainCircuit,
@@ -6,12 +8,15 @@ import {
   Play,
   Workflow,
 } from "lucide-react";
-export default function Home() {
+export default async function Home() {
+  const { userId } = await auth();
+  if (userId) redirect("/dashboard");
+
   return (
     <div className="min-h-screen gradient-orb">
       <header className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-10">
         <Link
-          href="/dashboard"
+          href="/sign-in"
           className="flex items-center gap-3 font-semibold"
         >
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-black text-white">
@@ -20,7 +25,7 @@ export default function Home() {
           learnwise
         </Link>
         <Link
-          href="/dashboard"
+          href="/sign-in"
           className="text-sm font-medium text-neutral-600 hover:text-black"
         >
           Open demo
@@ -40,18 +45,18 @@ export default function Home() {
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-8 text-neutral-500">
               Turn educational videos into personalized learning experiences
-              that understand what you've learned, detect where you're
+              that understand what you&apos;ve learned, detect where you&apos;re
               struggling, and guide you toward what to learn next.
             </p>
             <div className="mt-8 flex gap-3">
               <Link
-                href="/dashboard"
+                href="/sign-up"
                 className="inline-flex items-center gap-2 rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white"
               >
                 Start Learning <ArrowRight size={16} />
               </Link>
               <Link
-                href="/knowledge-map"
+                href="/sign-in"
                 className="inline-flex items-center gap-2 rounded-xl border border-[var(--line)] bg-white px-5 py-3 text-sm font-semibold"
               >
                 <Play size={16} />
