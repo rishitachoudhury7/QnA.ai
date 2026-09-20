@@ -33,11 +33,23 @@ export async function linkConceptToResource(resourceId: string, conceptId: strin
   if (error) throw new Error(error.message);
 }
 
-export async function createConceptRelationship(sourceConceptId: string, targetConceptId: string, relationshipType: ConceptRelationship["relationship_type"]): Promise<boolean> {
-  if (sourceConceptId === targetConceptId || (relationshipType === "prerequisite_of" && await relationshipWouldCycle(sourceConceptId, targetConceptId))) return false;
+export type RelationshipPersistenceResult = "inserted" | "duplicate" | "cycle" | "self";
+
+export async function createConceptRelationship(sourceConceptId: string, targetConceptId: string, relationshipType: ConceptRelationship["relationship_type"]): Promise<RelationshipPersistenceResult> {
+  if (sourceConceptId === targetConceptId) return "self";
+  if (relationshipType === "prerequisite_of" && await relationshipWouldCycle(sourceConceptId, targetConceptId)) return "cycle";
+  const { data: existing, error: existingError } = await supabaseAdmin
+    .from("concept_relationships")
+    .select("id")
+    .eq("source_concept_id", sourceConceptId)
+    .eq("target_concept_id", targetConceptId)
+    .eq("relationship_type", relationshipType)
+    .maybeSingle();
+  if (existingError) throw new Error(existingError.message);
+  if (existing) return "duplicate";
   const { error } = await supabaseAdmin.from("concept_relationships").upsert({ source_concept_id: sourceConceptId, target_concept_id: targetConceptId, relationship_type: relationshipType }, { onConflict: "source_concept_id,target_concept_id,relationship_type", ignoreDuplicates: true });
   if (error) throw new Error(error.message);
-  return true;
+  return "inserted";
 }
 
 async function relationshipWouldCycle(sourceId: string, targetId: string): Promise<boolean> {

@@ -19,7 +19,12 @@ export type Database = {
       assessment_attempts: { Row: AssessmentAttempt; Insert: AssessmentAttemptInsert; Update: Partial<AssessmentAttemptInsert>; Relationships: [] };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      match_video_segments: {
+        Args: { query_embedding: number[]; match_resource_id: string; match_count?: number; match_threshold?: number };
+        Returns: Array<{ id: string; resource_id: string; start_seconds: number; end_seconds: number; text: string; similarity: number }>;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

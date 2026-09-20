@@ -22,6 +22,7 @@ export async function processResourceKnowledge(resourceId: string): Promise<Know
   if (!segments?.length) throw new Error("EMPTY_SEGMENTS");
 
   const extracted = await extractConcepts(segments.map((segment) => ({ id: segment.id as string, startSeconds: Number(segment.start_seconds), endSeconds: Number(segment.end_seconds), text: segment.text as string })));
+  console.info("Phase 3 concepts extracted", { resourceId, conceptCount: extracted.length });
   const uniqueExtracted = [...new Map(extracted.map((concept) => [normalizeConceptName(concept.name), concept])).values()];
   const existing = await listConcepts();
   const conceptByName = new Map<string, Concept>();
@@ -44,16 +45,31 @@ export async function processResourceKnowledge(resourceId: string): Promise<Know
   let relationshipsCreated = 0;
   try {
     const relationships = await extractRelationships(uniqueExtracted.map((concept) => ({ name: concept.name, description: concept.description })));
+    let resolvedCount = 0;
+    let missingSourceCount = 0;
+    let missingTargetCount = 0;
+    let cycleRejectedCount = 0;
+    let insertedCount = 0;
+    console.info("Phase 3 relationship candidates", { resourceId, candidateCount: relationships.length });
     for (const relationship of relationships) {
       const source = conceptByName.get(normalizeConceptName(relationship.source_concept_name));
       const target = conceptByName.get(normalizeConceptName(relationship.target_concept_name));
+      if (!source) missingSourceCount += 1;
+      if (!target) missingTargetCount += 1;
       if (!source || !target) continue;
+      resolvedCount += 1;
       try {
-        if (await createConceptRelationship(source.id, target.id, relationship.relationship_type)) relationshipsCreated += 1;
+        const result = await createConceptRelationship(source.id, target.id, relationship.relationship_type);
+        if (result === "inserted") {
+          insertedCount += 1;
+          relationshipsCreated += 1;
+        }
+        if (result === "cycle") cycleRejectedCount += 1;
       } catch (error) {
         console.error("Could not persist concept relationship", { resourceId, relationship, error });
       }
     }
+    console.info("Phase 3 relationship diagnostics", { resourceId, candidateCount: relationships.length, resolvedCount, missingSourceCount, missingTargetCount, cycleRejectedCount, insertedCount });
   } catch (error) {
     console.error("Concept relationship extraction failed", { resourceId, error });
   }

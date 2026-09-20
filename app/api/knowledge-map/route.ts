@@ -22,6 +22,7 @@ export async function GET() {
     ]);
     if (conceptsError || relationshipsError || masteryError) throw conceptsError ?? relationshipsError ?? masteryError;
     const masteryByConcept = new Map((mastery ?? []).map((item) => [item.concept_id as string, Number(item.mastery_score)]));
+    console.info("Knowledge Map API graph counts", { conceptCount: concepts?.length ?? 0, relationshipCount: relationships?.length ?? 0 });
     return Response.json({ concepts: (concepts ?? []).map((concept) => ({ ...concept, mastery: masteryByConcept.get(concept.id as string) ?? 0 })), relationships: relationships ?? [] });
   } catch (error) {
     console.error("GET /api/knowledge-map failed", error);

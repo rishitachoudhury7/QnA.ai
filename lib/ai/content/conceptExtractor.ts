@@ -3,28 +3,38 @@ import { ExtractionSchema, RelationshipsSchema, type ExtractedConcept, type Extr
 
 export type ConceptSourceSegment = { id: string; startSeconds: number; endSeconds: number; text: string };
 
-const model = "gemini-3.6-flash";
+const configuredModel = process.env.GEMINI_CONCEPT_MODEL;
+const models = [...new Set([configuredModel, "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"].filter((value): value is string => Boolean(value)))];
 
 async function askGemini(prompt: string): Promise<unknown> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.1, responseMimeType: "application/json" },
-    }),
-  });
-  if (!response.ok) throw new Error("GEMINI_EXTRACTION_ERROR");
-  const payload = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error("GEMINI_EXTRACTION_ERROR");
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error("GEMINI_MALFORMED_OUTPUT");
+  let lastStatus = 0;
+  for (const model of models) {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.1, responseMimeType: "application/json" },
+      }),
+    });
+    if (!response.ok) {
+      lastStatus = response.status;
+      console.warn("Phase 3 Gemini request failed", { model, status: response.status });
+      continue;
+    }
+    const payload = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+    const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) continue;
+    try {
+      console.info("Phase 3 Gemini request succeeded", { model });
+      return JSON.parse(text);
+    } catch {
+      throw new Error("GEMINI_MALFORMED_OUTPUT");
+    }
   }
+  throw new Error(`GEMINI_EXTRACTION_ERROR_${lastStatus || "UNKNOWN"}`);
 }
 
 function segmentContext(segments: ConceptSourceSegment[]): string {
@@ -53,12 +63,19 @@ export async function extractConcepts(segments: ConceptSourceSegment[]): Promise
 
 export async function extractRelationships(concepts: Array<Pick<ExtractedConcept, "name" | "description">>): Promise<ExtractedRelationship[]> {
   if (concepts.length < 2) return [];
-  const prompt = `You are an educational knowledge engineer. Identify only meaningful relationships between the supplied concepts. Do not connect every pair. Avoid prerequisite cycles. Return JSON only with {"relationships":[{"source_concept_name":"...","target_concept_name":"...","relationship_type":"prerequisite_of|related_to|part_of"}]}. Both names must exactly match supplied concept names.\n\nCONCEPTS:\n${concepts.map((concept) => `- ${concept.name}: ${concept.description}`).join("\n")}`;
+  const prompt = `You are an educational knowledge engineer. Identify only meaningful educational relationships between the supplied concepts. Use only concepts from the supplied list; never invent or paraphrase concept names. Do not connect every concept to every other concept. Prefer prerequisite_of only when there is a genuine learning dependency, use related_to for connected concepts that are not prerequisites, and use part_of when one concept is a component or subtopic of another. Avoid prerequisite cycles. Return JSON only with {"relationships":[{"source_concept_name":"...","target_concept_name":"...","relationship_type":"prerequisite_of|related_to|part_of"}]}. Both names must exactly match supplied concept names.\n\nCONCEPTS:\n${concepts.map((concept) => `- ${concept.name}: ${concept.description}`).join("\n")}`;
   let lastError: unknown;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const parsed = RelationshipsSchema.safeParse(await askGemini(attempt ? `${prompt}\nPrevious output was invalid. Return corrected JSON only.` : prompt));
-      if (parsed.success) return parsed.data.relationships;
+      const raw = await askGemini(attempt ? `${prompt}\nPrevious output was invalid. Return corrected JSON only.` : prompt);
+      const rawRelationships = raw && typeof raw === "object" && "relationships" in raw && Array.isArray(raw.relationships) ? raw.relationships.length : 0;
+      console.info("Phase 3 relationship model output", { attempt: attempt + 1, rawRelationshipCount: rawRelationships });
+      const parsed = RelationshipsSchema.safeParse(raw);
+      if (parsed.success) {
+        console.info("Phase 3 relationship validation", { candidateCount: parsed.data.relationships.length });
+        return parsed.data.relationships;
+      }
+      console.warn("Phase 3 relationship validation rejected model output", { issueCount: parsed.error.issues.length });
       lastError = parsed.error;
     } catch (error) {
       lastError = error;

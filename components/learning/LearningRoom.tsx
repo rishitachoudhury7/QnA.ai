@@ -8,29 +8,23 @@ import {
   Check,
   ChevronRight,
   Mic,
-  Pause,
-  Play,
-  RotateCcw,
   Send,
   Sparkles,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddResource } from "@/components/resources/AddResource";
+import { YouTubePlayer } from "@/components/video/YouTubePlayer";
 import { RecommendedVideos, type RecommendedVideosProps } from "@/components/resources/RecommendedVideos";
 import { useAppState, type LearningResource } from "@/lib/state";
-const markers = [
-  { at: 6, label: "Features" },
-  { at: 21, label: "Gradient Descent" },
-  { at: 35, label: "Normalization" },
-];
-
 function topicLabel(topicId: string) {
   return topicId
     .split("-")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
+
+type TutorMessage = { question: string; answer: string; citations: Array<{ segment_id: string; label: string; startSeconds: number }> };
 
 function ResourceRequiredState({
   topicId,
@@ -73,7 +67,7 @@ export function LearningRoom() {
   const topicId = String(params.resourceId ?? "linear-regression").toLowerCase();
   const topic = topicLabel(topicId);
   const { mastery, setMastery, resources, isResourcesLoading, createResource, updateResource } = useAppState();
-  const topicResources = useMemo(() => resources.filter((resource) => resource.topicId === topicId), [resources, topicId]);
+  const topicResources = useMemo(() => resources.filter((resource) => resource.topicId === topicId || resource.id === topicId), [resources, topicId]);
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
   const [isAddingResource, setIsAddingResource] = useState(false);
   const [isAnalyzingConcepts, setIsAnalyzingConcepts] = useState(false);
@@ -90,14 +84,16 @@ export function LearningRoom() {
     return () => window.clearInterval(poll);
   }, [activeResource?.id, activeResource?.status, updateResource]);
   const [resourceFeedback, setResourceFeedback] = useState(false);
-  const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(23.7);
   const [quick, setQuick] = useState(false);
   const [teach, setTeach] = useState(false);
   const [answer, setAnswer] = useState<number | null>(null);
   const [question, setQuestion] = useState("");
-  const [asked, setAsked] = useState(false);
   const [explanation, setExplanation] = useState("");
+  const [tutorMessages, setTutorMessages] = useState<TutorMessage[]>([]);
+  const [isTutorLoading, setIsTutorLoading] = useState(false);
+  const [tutorError, setTutorError] = useState<string | null>(null);
+  const seekPlayerRef = useRef<(seconds: number) => void>(() => undefined);
   const chooseResource = (resource: LearningResource) => {
     setSelectedResourceId(resource.id);
     setResourceFeedback(true);
@@ -116,10 +112,25 @@ export function LearningRoom() {
   };
   const minutes = Math.floor(time),
     seconds = Math.floor((time - minutes) * 60);
-  const current = useMemo(
-    () => (time >= 21 ? "Gradient Descent" : "Features"),
-    [time],
-  );
+  const current = "Video context";
+  const handleTimeChange = useCallback((secondsValue: number) => setTime(secondsValue), []);
+  const handleSeekReady = useCallback((seek: (seconds: number) => void) => { seekPlayerRef.current = seek; }, []);
+  const askTutor = async () => {
+    const submittedQuestion = question.trim();
+    if (!submittedQuestion || isTutorLoading) return;
+    setIsTutorLoading(true);
+    setTutorError(null);
+    try {
+      const response = await fetch(`/api/resources/${activeResource.id}/tutor`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: submittedQuestion, currentSeconds: time }) });
+      const payload = await response.json() as { answer?: string; citations?: Array<{ segment_id: string; label: string }>; context?: Array<{ id: string; startSeconds: number }>; error?: string };
+      if (!response.ok || !payload.answer) throw new Error(payload.error ?? "Could not answer from this video");
+      const contextById = new Map((payload.context ?? []).map((segment) => [segment.id, segment.startSeconds]));
+      setTutorMessages((messages) => [...messages, { question: submittedQuestion, answer: payload.answer!, citations: (payload.citations ?? []).map((citation) => ({ ...citation, startSeconds: contextById.get(citation.segment_id) ?? 0 })) }]);
+      setQuestion("");
+    } catch (error) {
+      setTutorError(error instanceof Error ? error.message : "Could not answer from this video");
+    } finally { setIsTutorLoading(false); }
+  };
   const submit = () => {
     setAnswer(1);
     setMastery(51);
@@ -192,55 +203,12 @@ export function LearningRoom() {
         {activeResource.knowledgeStatus === "completed" && <div className="mt-3 rounded-xl border border-[#8cd5af]/20 bg-[#8cd5af]/10 px-4 py-3 text-xs text-[#bcebd0]">Knowledge map updated: {activeResource.knowledgeConcepts ?? 0} concepts and {activeResource.knowledgeRelationships ?? 0} relationships.</div>}
         <div className="grid gap-4 pt-4 lg:grid-cols-[1.55fr_.85fr]">
           <section className="min-w-0">
-            <div className="aspect-video overflow-hidden rounded-2xl border border-white/10 bg-[#1b1d1a] shadow-2xl">
-              <div className="grid h-full place-items-center">
-                <div className="text-center">
-                  <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white/10">
-                    <Play size={25} fill="white" />
-                  </div>
-                  <div className="mt-3 text-sm text-white/50">
-                    Mock YouTube player
-                  </div>
-                </div>
-              </div>
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#1b1d1a] shadow-2xl">
+              <YouTubePlayer url={activeResource.url ?? ""} currentSeconds={time} onTimeChange={handleTimeChange} onSeekReady={handleSeekReady} />
               <div className="border-t border-white/10 bg-[#171916] p-3">
-                <div className="relative h-5">
-                  <div className="absolute top-2 h-1 w-full rounded-full bg-white/10" />
-                  <div
-                    className="absolute top-2 h-1 rounded-full bg-[#8cd5af]"
-                    style={{ width: `${(time / 48.35) * 100}%` }}
-                  />
-                  <div className="absolute inset-0">
-                    {markers.map((m) => (
-                      <button
-                        key={m.at}
-                        title={`${m.label} · ${m.at}:42`}
-                        onClick={() => setTime(m.at)}
-                        className="absolute top-0 h-5 w-5 -translate-x-1/2 rounded-full border-4 border-[#171916] bg-[#c9a338] hover:scale-125"
-                        style={{ left: `${(m.at / 48.35) * 100}%` }}
-                      />
-                    ))}
-                  </div>
-                </div>
-                <div className="mt-2 flex items-center gap-3">
-                  <button
-                    onClick={() => setPlaying((v) => !v)}
-                    className="grid h-8 w-8 place-items-center rounded-lg hover:bg-white/5"
-                  >
-                    {playing ? <Pause size={15} /> : <Play size={15} />}
-                  </button>
-                  <button
-                    onClick={() => setTime(0)}
-                    className="grid h-8 w-8 place-items-center rounded-lg hover:bg-white/5"
-                  >
-                    <RotateCcw size={14} />
-                  </button>
-                  <span className="text-xs text-white/50">
-                    {minutes}:{String(seconds).padStart(2, "0")} / 48:21
-                  </span>
-                  <div className="ml-auto text-[10px] text-white/30">
-                    ● concept markers
-                  </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-white/50">Context timestamp: {minutes}:{String(seconds).padStart(2, "0")}</span>
+                  <div className="ml-auto text-[10px] text-white/30">● live YouTube playback</div>
                 </div>
               </div>
             </div>
@@ -258,7 +226,7 @@ export function LearningRoom() {
               </div>
               <div className="mt-4 grid gap-2 sm:grid-cols-3">
                 <button
-                  onClick={() => setAsked(true)}
+                  onClick={() => setQuestion("What is happening at this moment?")}
                   className="rounded-xl border border-white/10 px-3 py-3 text-left text-xs font-semibold hover:bg-white/5"
                 >
                   <Sparkles size={14} className="mb-2 text-[#8cd5af]" />
@@ -291,40 +259,15 @@ export function LearningRoom() {
                   </div>
                 </div>
                 <span className="rounded-full bg-white/5 px-2.5 py-1 text-[10px] text-white/50">
-                  ● Using 22:42–24:42
+                  ● Hybrid context retrieval
                 </span>
               </div>
             </div>
             <div className="flex-1 space-y-5 overflow-auto p-5">
-              <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-white px-4 py-3 text-sm leading-6 text-neutral-800">
-                Why did the instructor use normalization here?
-              </div>
-              <div className="max-w-[92%]">
-                <div className="mb-2 flex items-center gap-2 text-xs text-white/40">
-                  <div className="grid h-6 w-6 place-items-center rounded-md bg-white/10">
-                    <Sparkles size={12} />
-                  </div>
-                  AI Tutor
-                </div>
-                <div className="rounded-2xl rounded-tl-md bg-[#20231f] px-4 py-4 text-sm leading-6 text-white/75">
-                  The instructor normalized the features because they have
-                  different scales. Without normalization, larger-valued
-                  features can disproportionately influence gradient-based
-                  optimization.
-                </div>
-                <div className="mt-3 rounded-xl border border-white/10 p-3 text-[11px] text-white/40">
-                  <div className="font-semibold text-white/60">Based on</div>
-                  <div className="mt-1">23:10 — Feature Scaling</div>
-                  <div>23:34 — Normalization</div>
-                </div>
-              </div>
-              {asked && (
-                <div className="max-w-[92%] rounded-2xl bg-[#20231f] px-4 py-3 text-sm leading-6 text-white/75">
-                  Think of normalization as putting every feature onto a
-                  comparable scale so the optimizer can move fairly in every
-                  direction.
-                </div>
-              )}
+              {!tutorMessages.length && <div className="rounded-2xl border border-white/10 p-4 text-sm leading-6 text-white/50">Ask a question about the current moment. Answers are grounded in this video&apos;s timestamped transcript.</div>}
+              {tutorMessages.map((message, index) => <div key={`${message.question}-${index}`} className="space-y-3"><div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-white px-4 py-3 text-sm leading-6 text-neutral-800">{message.question}</div><div className="max-w-[92%]"><div className="mb-2 flex items-center gap-2 text-xs text-white/40"><div className="grid h-6 w-6 place-items-center rounded-md bg-white/10"><Sparkles size={12} /></div>AI Tutor</div><div className="rounded-2xl rounded-tl-md bg-[#20231f] px-4 py-4 text-sm leading-6 text-white/75">{message.answer}</div>{message.citations.length > 0 && <div className="mt-3 rounded-xl border border-white/10 p-3 text-[11px] text-white/40"><div className="font-semibold text-white/60">Based on</div>{message.citations.map((citation) => <button key={citation.segment_id} onClick={() => seekPlayerRef.current(citation.startSeconds)} className="mt-1 block text-left text-[#bcebd0] hover:underline">{citation.label}</button>)}</div>}</div></div>)}
+              {isTutorLoading && <div className="rounded-2xl bg-[#20231f] px-4 py-3 text-sm text-white/50">Searching the transcript around this moment...</div>}
+              {tutorError && <div className="rounded-xl border border-[#c9a338]/30 bg-[#c9a338]/10 px-4 py-3 text-xs text-[#ead58c]">{tutorError}</div>}
             </div>
             <div className="border-t border-white/10 p-4">
               <div className="flex flex-wrap gap-2 pb-3">
@@ -347,12 +290,13 @@ export function LearningRoom() {
                 <input
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && setAsked(true)}
+                  onKeyDown={(e) => e.key === "Enter" && void askTutor()}
                   placeholder="Ask about this moment..."
                   className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none placeholder:text-white/25"
                 />
                 <button
-                  onClick={() => setAsked(true)}
+                  onClick={() => void askTutor()}
+                  disabled={isTutorLoading || !question.trim()}
                   className="grid h-8 w-8 place-items-center rounded-lg bg-white text-black"
                 >
                   <Send size={14} />
