@@ -15,7 +15,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AddResource } from "@/components/resources/AddResource";
 import { RecommendedVideos, type RecommendedVideosProps } from "@/components/resources/RecommendedVideos";
 import { useAppState, type LearningResource } from "@/lib/state";
@@ -72,10 +72,23 @@ export function LearningRoom() {
   const params = useParams<{ resourceId: string }>();
   const topicId = String(params.resourceId ?? "linear-regression").toLowerCase();
   const topic = topicLabel(topicId);
-  const { mastery, setMastery, resources, isResourcesLoading, addResource } = useAppState();
+  const { mastery, setMastery, resources, isResourcesLoading, createResource, updateResource } = useAppState();
   const topicResources = useMemo(() => resources.filter((resource) => resource.topicId === topicId), [resources, topicId]);
   const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
+  const [isAddingResource, setIsAddingResource] = useState(false);
+  const [isAnalyzingConcepts, setIsAnalyzingConcepts] = useState(false);
+  const [conceptError, setConceptError] = useState<string | null>(null);
   const activeResource = topicResources.find((resource) => resource.id === selectedResourceId) ?? topicResources[0];
+  useEffect(() => {
+    if (!activeResource?.id || activeResource.status !== "processing") return;
+    const poll = window.setInterval(() => {
+      void fetch(`/api/resources/${activeResource.id}/status`, { credentials: "include" })
+        .then(async (response) => response.ok ? await response.json() as { status: LearningResource["status"]; error?: string } : null)
+        .then((status) => { if (status) updateResource(activeResource.id, { status: status.status, error: status.error }); })
+        .catch(() => undefined);
+    }, 4000);
+    return () => window.clearInterval(poll);
+  }, [activeResource?.id, activeResource?.status, updateResource]);
   const [resourceFeedback, setResourceFeedback] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(23.7);
@@ -90,8 +103,8 @@ export function LearningRoom() {
     setResourceFeedback(true);
     window.setTimeout(() => setResourceFeedback(false), 1200);
   };
-  const chooseRecommended: RecommendedVideosProps["onChoose"] = (video) => {
-    const resource = addResource({
+  const chooseRecommended: RecommendedVideosProps["onChoose"] = async (video) => {
+    const resource = await createResource({
       topicId,
       type: "youtube",
       title: video.title,
@@ -99,7 +112,7 @@ export function LearningRoom() {
       duration: video.duration,
       source: video.source ?? video.title,
     });
-    chooseResource(resource);
+    if (resource) chooseResource(resource);
   };
   const minutes = Math.floor(time),
     seconds = Math.floor((time - minutes) * 60);
@@ -121,6 +134,34 @@ export function LearningRoom() {
   if (!activeResource) {
     return <ResourceRequiredState topicId={topicId} topic={topic} onResourceAdded={chooseResource} onChoose={chooseRecommended} />;
   }
+  if (activeResource.status === "processing" || activeResource.status === "pending") {
+    return <div className="grid min-h-screen place-items-center bg-[#111210] px-6 text-center text-white"><div><BookOpen className="mx-auto text-[#8cd5af]" size={30} /><h1 className="mt-5 text-2xl font-semibold">Preparing your learning material...</h1><p className="mt-2 max-w-md text-sm leading-6 text-white/50">We&apos;re fetching the transcript, preserving timestamps, and indexing this video for learning.</p></div></div>;
+  }
+  if (activeResource.status === "failed") {
+    const retry = async () => {
+      updateResource(activeResource.id, { status: "processing", error: undefined });
+      await fetch(`/api/resources/${activeResource.id}/ingest`, { method: "POST", credentials: "include" }).catch(() => undefined);
+    };
+    return <div className="grid min-h-screen place-items-center bg-[#111210] px-6 text-center text-white"><div><BookOpen className="mx-auto text-[#c9a338]" size={30} /><h1 className="mt-5 text-2xl font-semibold">We couldn&apos;t prepare this resource.</h1><p className="mt-2 max-w-md text-sm leading-6 text-white/50">{activeResource.error ?? "The transcript or video could not be processed."}</p><div className="mt-6 flex flex-wrap justify-center gap-3"><button onClick={() => setIsAddingResource(true)} className="inline-flex items-center rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold text-white/80 hover:bg-white/10">Add a different resource</button><button onClick={() => void retry()} className="rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black">Try processing it again</button></div></div>{isAddingResource && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm"><div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-2xl bg-[#f7f7f4] p-5 text-left text-neutral-900 sm:p-8"><AddResource topic={topicId} compact onCancel={() => setIsAddingResource(false)} onResourceAdded={(resource) => { setIsAddingResource(false); chooseResource(resource); }} /></div></div>}</div>;
+  }
+  const analyzeConcepts = async () => {
+    setIsAnalyzingConcepts(true);
+    setConceptError(null);
+    try {
+      const response = await fetch(`/api/resources/${activeResource.id}/concepts`, { method: "POST", credentials: "include" });
+      const payload = await response.json() as { error?: string; knowledgeConcepts?: number; knowledgeRelationships?: number; conceptsCreated?: number; relationshipsCreated?: number };
+      if (!response.ok) throw new Error(payload.error ?? "Could not analyze concepts");
+      updateResource(activeResource.id, { knowledgeStatus: "completed", knowledgeConcepts: payload.conceptsCreated, knowledgeRelationships: payload.relationshipsCreated });
+    } catch (error) {
+      setConceptError(error instanceof Error ? error.message : "Could not analyze concepts");
+    } finally {
+      setIsAnalyzingConcepts(false);
+    }
+  };
+  const reprocessResource = async () => {
+    updateResource(activeResource.id, { status: "processing", knowledgeError: undefined });
+    await fetch(`/api/resources/${activeResource.id}/ingest`, { method: "POST", credentials: "include" }).catch(() => undefined);
+  };
   return (
     <div className="min-h-screen bg-[#111210] text-white">
       {resourceFeedback && <div className="fixed right-5 top-5 z-50 rounded-xl bg-[#8cd5af] px-4 py-3 text-sm font-semibold text-[#111210]">✓ Added to your learning room</div>}
@@ -140,12 +181,15 @@ export function LearningRoom() {
               Supervised Learning · Learning Room
             </div>
           </div>
+          {activeResource.status === "ready" && <button onClick={() => void analyzeConcepts()} disabled={isAnalyzingConcepts} className="rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/70 hover:bg-white/5 disabled:opacity-50">{isAnalyzingConcepts ? "Building knowledge map..." : activeResource.knowledgeStatus === "completed" ? "Rebuild Knowledge Map" : "Analyze Concepts"}</button>}
           {topicResources.length > 1 && <select value={activeResource.id} onChange={(event) => setSelectedResourceId(event.target.value)} className="max-w-[210px] rounded-lg border border-white/10 bg-[#171916] px-3 py-2 text-xs text-white/70 outline-none"><option value={activeResource.id}>{activeResource.title}</option>{topicResources.filter((resource) => resource.id !== activeResource.id).map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select>}
           <div className="hidden items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs sm:flex">
             Mastery{" "}
             <span className="font-semibold text-[#8cd5af]">{mastery}%</span>
           </div>
         </header>
+        {conceptError && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#c9a338]/30 bg-[#c9a338]/10 px-4 py-3 text-xs text-[#ead58c]"><span>{conceptError}</span>{conceptError.includes("no processed transcript segments") && <button onClick={() => void reprocessResource()} className="rounded-lg bg-[#ead58c] px-3 py-2 font-semibold text-[#111210]">Reprocess video</button>}</div>}
+        {activeResource.knowledgeStatus === "completed" && <div className="mt-3 rounded-xl border border-[#8cd5af]/20 bg-[#8cd5af]/10 px-4 py-3 text-xs text-[#bcebd0]">Knowledge map updated: {activeResource.knowledgeConcepts ?? 0} concepts and {activeResource.knowledgeRelationships ?? 0} relationships.</div>}
         <div className="grid gap-4 pt-4 lg:grid-cols-[1.55fr_.85fr]">
           <section className="min-w-0">
             <div className="aspect-video overflow-hidden rounded-2xl border border-white/10 bg-[#1b1d1a] shadow-2xl">

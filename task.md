@@ -20,16 +20,16 @@
 - [x] ✅ Goal creation loading/error states and generated dashboard path
 
 ## PHASE 2: YouTube Ingestion & Content Engine
-- [ ] Implement background processing flow (`PROCESSING` -> `READY`)
-- [ ] Implement YouTube Metadata & Transcript fetching
-- [ ] Implement Temporal & Semantic Chunking
-- [ ] Implement `lib/ai/content/embeddings.ts` (Gemini embeddings -> pgvector)
+- [x] ✅ Implement background processing flow (`PROCESSING` -> `READY`)
+- [x] ✅ Implement YouTube Metadata & Transcript fetching
+- [x] ✅ Implement Temporal & Semantic Chunking
+- [x] ✅ Implement `lib/ai/content/embeddings.ts` (Gemini embeddings -> pgvector)
 
 ## PHASE 3: AI Knowledge Engine
-- [ ] Implement `lib/ai/content/conceptExtractor.ts` (Gemini structured concepts)
-- [ ] Implement Zod validation (`ConceptSchema`) and retry logic
-- [ ] Implement concept deduplication and relationship building
-- [ ] Persist concepts and relationships to DB
+- [x] ✅ Implement `lib/ai/content/conceptExtractor.ts` (Gemini structured concepts)
+- [x] ✅ Implement Zod validation (`ConceptSchema`) and retry logic
+- [x] ✅ Implement concept deduplication and relationship building
+- [x] ✅ Persist concepts and relationships to DB
 
 ## PHASE 4: Timestamp-Aware Tutor
 - [x] ✅ Build `app/learn/[resourceId]/page.tsx`

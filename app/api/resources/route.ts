@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { processYouTubeResource } from "@/lib/ai/content/ingestion";
 import { createResource, listResources } from "@/lib/data/resources";
 import { ensureCurrentUser } from "@/lib/data/users";
 
@@ -26,9 +28,12 @@ export async function POST(request: Request) {
       title: String(body.title ?? "").trim(),
       url: body.url ?? null,
       duration_seconds: typeof body.durationSeconds === "number" ? body.durationSeconds : null,
-      status: body.status ?? "pending",
+      status: body.type === "youtube" ? "processing" : body.status ?? "pending",
       metadata: body.metadata ?? {},
     }, user.id);
+    if (resource.type === "youtube") {
+      after(async () => { await processYouTubeResource(resource.id).catch(() => undefined); });
+    }
     return Response.json(resource, { status: 201 });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Could not create resource" }, { status: 400 });

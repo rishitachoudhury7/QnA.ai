@@ -10,7 +10,7 @@ import {
   useEdgesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, CircleAlert, Sparkles, X } from "lucide-react";
 import { useAppState } from "@/lib/state";
 const initial = [
@@ -23,7 +23,8 @@ const initial = [
   ["Gradient Descent", 34, 78, 42, "attention"],
   ["Optimization", 68, 78, 29, "attention"],
 ];
-function Node({ data }: { data: any }) {
+type ConceptNodeData = { name: string; mastery: number; state: string };
+function Node({ data }: { data: ConceptNodeData }) {
   const s = data.state;
   const dot =
     s === "strong"
@@ -83,6 +84,31 @@ export function KnowledgeMap() {
       style: { stroke: "#cfcfc8" },
     })),
   );
+  useEffect(() => {
+    let active = true;
+    fetch("/api/knowledge-map", { credentials: "include" })
+      .then(async (response) => response.ok ? await response.json() as { concepts: Array<{ id: string; name: string; mastery: number }>; relationships: Array<{ id: string; source_concept_id: string; target_concept_id: string; relationship_type: string }> } : null)
+      .then((graph) => {
+        if (!active || !graph?.concepts.length) return;
+        setNodes(graph.concepts.map((concept, index) => ({
+          id: concept.id,
+          type: "concept",
+          position: { x: (index % 4) * 190, y: Math.floor(index / 4) * 150 },
+          data: { name: concept.name, mastery: concept.mastery, state: concept.mastery >= 70 ? "strong" : concept.mastery > 0 ? "developing" : "attention" },
+        })));
+        const conceptIds = new Set(graph.concepts.map((concept) => concept.id));
+        setEdges(graph.relationships.filter((relationship) => conceptIds.has(relationship.source_concept_id) && conceptIds.has(relationship.target_concept_id)).map((relationship) => ({
+          id: relationship.id,
+          source: relationship.source_concept_id,
+          target: relationship.target_concept_id,
+          animated: relationship.relationship_type === "prerequisite_of",
+          label: relationship.relationship_type.replaceAll("_", " "),
+          style: { stroke: "#cfcfc8" },
+        })));
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [setEdges, setNodes]);
   const chosen = nodes.find((n) => n.id === selected);
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8 lg:px-10">

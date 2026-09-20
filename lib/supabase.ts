@@ -11,6 +11,9 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: false,
     detectSessionInUrl: false,
   },
+  global: {
+    fetch: (url, init) => fetch(url, { ...init, cache: "no-store" }),
+  },
 });
 
 export const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
@@ -18,5 +21,8 @@ export const supabaseAdmin = createClient<Database>(supabaseUrl, supabaseService
     persistSession: false,
     autoRefreshToken: false,
     detectSessionInUrl: false,
+  },
+  global: {
+    fetch: (url, init) => fetch(url, { ...init, cache: "no-store" }),
   },
 });
