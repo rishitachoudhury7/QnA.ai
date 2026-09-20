@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { UserButton, useUser } from "@clerk/nextjs";
 import {
   BookOpen,
   BrainCircuit,
@@ -22,6 +23,7 @@ const items = [
 ] as const;
 export function Sidebar() {
   const path = usePathname();
+  const { user } = useUser();
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -93,11 +95,11 @@ export function Sidebar() {
         </div>
         <div className="mt-auto rounded-2xl bg-[var(--soft)] p-4">
           <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-neutral-900 text-xs font-bold text-white">
-              SM
-            </div>
+            <UserButton appearance={{ elements: { avatarBox: "h-9 w-9" } }} />
             <div>
-              <div className="text-sm font-semibold">Sayan</div>
+              <div className="text-sm font-semibold">
+                {user?.fullName ?? user?.firstName ?? "Your profile"}
+              </div>
               <div className="text-xs text-neutral-500">
                 7 day learning streak
               </div>

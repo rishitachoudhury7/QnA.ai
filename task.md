@@ -4,14 +4,20 @@
 - [x] ✅ Initialize Next.js project (TypeScript, Tailwind, App Router)
 - [ ] Setup shadcn/ui and necessary components
 - [x] ✅ Install and configure Framer Motion
-- [ ] Configure Clerk for authentication
-- [ ] Initialize Supabase client
+- [x] ✅ Configure Clerk for authentication
+- [x] ✅ Initialize Supabase client
 
 ## PHASE 1: Database & Learning Architecture
-- [ ] Define and migrate schema (`users`, `learning_goals`, `learning_paths`, `path_modules`, `resources`, `video_segments`)
-- [ ] Define and migrate schema (`concepts`, `concept_relationships`, `resource_concepts`)
-- [ ] Define and migrate schema (`student_concept_mastery`, `learning_interactions`, `assessments`, `assessment_attempts`)
-- [ ] Build "Structured Learning" vs "Quick Learn" flow models (Frontend routes created; DB models pending)
+- [x] ✅ Define and migrate schema (`users`, `learning_goals`, `learning_paths`, `path_modules`, `resources`, `video_segments`)
+- [x] ✅ Define and migrate schema (`concepts`, `concept_relationships`, `resource_concepts`)
+- [x] ✅ Define and migrate schema (`student_concept_mastery`, `learning_interactions`, `assessments`, `assessment_attempts`)
+- [x] ✅ Build "Structured Learning" vs "Quick Learn" flow models (Frontend routes created; DB models created)
+
+## PHASE 1.5: AI Curriculum Generation
+- [x] ✅ Groq curriculum generator with server-only API key
+- [x] ✅ Zod validation and limited retry for structured output
+- [x] ✅ Versioned learning path, module, and topic persistence
+- [x] ✅ Goal creation loading/error states and generated dashboard path
 
 ## PHASE 2: YouTube Ingestion & Content Engine
 - [ ] Implement background processing flow (`PROCESSING` -> `READY`)
@@ -32,7 +38,8 @@
 - [ ] Implement `lib/ai/content/tutor.ts` with explicit Grounding Rules
 
 ## PHASE 5: Learner Engine & Mastery Model
-- [ ] Define Evidence-Based Mastery model (Observation, Assessment, Explanation)
+- [x] ✅ Define Evidence-Based Mastery model (Observation, Assessment, Explanation)
+- [x] ✅ Interactive Quick Check & Teach-Back evaluation UI
 - [ ] Implement `lib/ai/learner/assessment.ts` (Quick Checks / Zod validated)
 - [ ] Implement `lib/ai/learner/misconception.ts` (Teach-back evaluation)
 - [ ] Track and update `student_concept_mastery` and `learning_interactions`

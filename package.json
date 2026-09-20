@@ -9,12 +9,15 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.9.4",
+    "@supabase/supabase-js": "^2.116.0",
     "@xyflow/react": "^12.11.6",
     "framer-motion": "^13.2.0",
     "lucide-react": "^1.43.0",
     "next": "16.3.4",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

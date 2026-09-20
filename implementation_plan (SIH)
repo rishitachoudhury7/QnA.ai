@@ -57,17 +57,23 @@ The AI layer is structured into three distinct engines for separation of concern
 *Goal: Define the platform structure (Goals → Paths → Modules → Resources → Concepts) and robust schema.*
 
 #### Data Architecture Schema
-- [ ] ⏳ `users`
-- [ ] ⏳ `learning_goals`, `learning_paths`, `path_modules`
-- [ ] ⏳ `resources`, `video_segments`
-- [ ] ⏳ `concepts`, `concept_relationships`, `resource_concepts`
-- [ ] ⏳ `student_concept_mastery`
-- [ ] ⏳ `learning_interactions`, `assessments`, `assessment_attempts`
+- [x] ✅ `users`
+- [x] ✅ `learning_goals`, `learning_paths`, `path_modules`, `topics`
+- [x] ✅ `resources`, `video_segments`
+- [x] ✅ `concepts`, `concept_relationships`, `resource_concepts`
+- [x] ✅ `student_concept_mastery`
+- [x] ✅ `learning_interactions`, `assessments`, `assessment_attempts`
 
 #### Core Feature: Structured Learning vs Quick Learn
 - [x] ✅ **Structured Learning (Frontend)**: Goal creation route (`/goals`), Path overview (`/paths`), and Module detail page (`/paths/[id]`).
 - [x] ✅ **Quick Learn (Frontend)**: Multi-modal resource ingestion UI (`/quick-learn` & `/add-resource`) with YouTube URL input and timestamp parser.
-- [ ] ⏳ Connect flows to database persistence.
+- [x] ✅ Connect goal and resource flows to authenticated database persistence.
+
+### PHASE 1.5: AI Curriculum Generation [x]
+- [x] ✅ Generate structured curricula with Groq server-side.
+- [x] ✅ Validate and retry structured output with Zod.
+- [x] ✅ Persist versioned paths, modules, and topics with rollback cleanup.
+- [x] ✅ Display the authenticated user's generated path on the dashboard.
 
 ---
 

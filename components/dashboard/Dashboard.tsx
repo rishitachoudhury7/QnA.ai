@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useAppState } from "@/lib/state";
 import { ProgressRing } from "@/components/common/ProgressRing";
+import { GoalSetup } from "@/components/goals/GoalSetup";
 const path = [
   ["Python", "done"],
   ["Mathematics", "progress"],
@@ -19,7 +20,16 @@ const path = [
   ["Deep Learning", "locked"],
 ];
 export function Dashboard() {
-  const { mastery, recommendation } = useAppState();
+  const { recommendation, goal, paths, isStateLoading } = useAppState();
+  const currentPath = paths.find((path) => path.goalId === goal?.id) ?? paths[0];
+  if (isStateLoading) {
+    return (
+      <div className="grid min-h-[70vh] place-items-center px-6 text-sm text-neutral-500">
+        Loading your learning space...
+      </div>
+    );
+  }
+  if (!goal) return <GoalSetup />;
   return (
     <div className="mx-auto max-w-7xl px-6 py-8 lg:px-10">
       <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -56,9 +66,9 @@ export function Dashboard() {
               <span className="inline-flex items-center gap-2 rounded-full bg-[#edf6f1] px-2.5 py-1 text-xs font-semibold text-[#1f7a5a]">
                 Current Learning
               </span>
-              <h2 className="mt-5 text-2xl font-semibold">Machine Learning</h2>
+              <h2 className="mt-5 text-2xl font-semibold">{goal.title}</h2>
               <p className="mt-1 text-sm text-neutral-500">
-                Currently learning · Linear Regression
+                {currentPath ? currentPath.title : "Your learning path is being prepared"}
               </p>
             </div>
             <ProgressRing value={68} size={78} />
@@ -74,7 +84,7 @@ export function Dashboard() {
               </div>
             </div>
             <Link
-              href="/paths/ml"
+              href={currentPath ? `/paths/${currentPath.id}` : "/paths"}
               className="inline-flex items-center gap-2 rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white"
             >
               Continue Learning <ArrowRight size={15} />
@@ -111,17 +121,17 @@ export function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <div className="eyebrow text-neutral-400">Learning path</div>
-              <h2 className="mt-1 text-xl font-semibold">Machine Learning</h2>
+              <h2 className="mt-1 text-xl font-semibold">{currentPath?.title ?? goal.title}</h2>
             </div>
             <Link
-              href="/paths/ml"
+              href={currentPath ? `/paths/${currentPath.id}` : "/paths"}
               className="text-sm font-medium text-neutral-500 hover:text-black"
             >
               Open path
             </Link>
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
-            {path.map(([name, state], i) => (
+            {(currentPath ? currentPath.modules.map((module) => [module.title, "progress"] as [string, string]) : path).map(([name, state], i) => (
               <div
                 key={name}
                 className="flex min-w-[150px] flex-1 items-center gap-3 rounded-2xl border border-[var(--line)] bg-white p-4"

@@ -1,12 +1,12 @@
 "use client";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
   BookOpen,
   Check,
   ChevronRight,
-  Clock3,
   Mic,
   Pause,
   Play,
@@ -16,14 +16,67 @@ import {
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useAppState } from "@/lib/state";
+import { AddResource } from "@/components/resources/AddResource";
+import { RecommendedVideos, type RecommendedVideosProps } from "@/components/resources/RecommendedVideos";
+import { useAppState, type LearningResource } from "@/lib/state";
 const markers = [
   { at: 6, label: "Features" },
   { at: 21, label: "Gradient Descent" },
   { at: 35, label: "Normalization" },
 ];
+
+function topicLabel(topicId: string) {
+  return topicId
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function ResourceRequiredState({
+  topicId,
+  topic,
+  onResourceAdded,
+  onChoose,
+}: {
+  topicId: string;
+  topic: string;
+  onResourceAdded: (resource: LearningResource) => void;
+  onChoose: RecommendedVideosProps["onChoose"];
+}) {
+  const [isAdding, setIsAdding] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-[#111210] px-4 py-4 text-white lg:px-6">
+      <div className="mx-auto max-w-[1100px]">
+        <header className="border-b border-white/10 pb-5">
+          <Link href="/paths/ml" className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-white"><ArrowLeft size={16} /> Learning Path</Link>
+          <div className="mt-6 text-xs text-white/40">Supervised Learning · Learning Room</div>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">{topic}</h1>
+        </header>
+        <section className="mt-8 rounded-2xl border border-white/10 bg-[#171916] px-6 py-12 text-center sm:px-12">
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-[#8cd5af]/10 text-[#8cd5af]"><BookOpen size={24} /></div>
+          <h2 className="mt-5 text-2xl font-semibold">Let&apos;s add something to learn from.</h2>
+          <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-white/50">Add a YouTube video, course, PDF or another resource and we&apos;ll turn it into an interactive learning experience.</p>
+          <button onClick={() => setIsAdding(true)} className="mt-7 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black"><Sparkles size={16} /> Add Learning Resource</button>
+        </section>
+        <RecommendedVideos topic={topicId} onChoose={onChoose} />
+      </div>
+      <AnimatePresence>
+        {isAdding && <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm"><motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 15 }} className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-2xl bg-[#f7f7f4] p-5 text-neutral-900 sm:p-8"><AddResource topic={topicId} compact onCancel={() => setIsAdding(false)} onResourceAdded={(resource) => { setIsAdding(false); onResourceAdded(resource); }} /></motion.div></div>}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function LearningRoom() {
-  const { mastery, setMastery } = useAppState();
+  const params = useParams<{ resourceId: string }>();
+  const topicId = String(params.resourceId ?? "linear-regression").toLowerCase();
+  const topic = topicLabel(topicId);
+  const { mastery, setMastery, resources, isResourcesLoading, addResource } = useAppState();
+  const topicResources = useMemo(() => resources.filter((resource) => resource.topicId === topicId), [resources, topicId]);
+  const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
+  const activeResource = topicResources.find((resource) => resource.id === selectedResourceId) ?? topicResources[0];
+  const [resourceFeedback, setResourceFeedback] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(23.7);
   const [quick, setQuick] = useState(false);
@@ -32,6 +85,22 @@ export function LearningRoom() {
   const [question, setQuestion] = useState("");
   const [asked, setAsked] = useState(false);
   const [explanation, setExplanation] = useState("");
+  const chooseResource = (resource: LearningResource) => {
+    setSelectedResourceId(resource.id);
+    setResourceFeedback(true);
+    window.setTimeout(() => setResourceFeedback(false), 1200);
+  };
+  const chooseRecommended: RecommendedVideosProps["onChoose"] = (video) => {
+    const resource = addResource({
+      topicId,
+      type: "youtube",
+      title: video.title,
+      url: video.url,
+      duration: video.duration,
+      source: video.source ?? video.title,
+    });
+    chooseResource(resource);
+  };
   const minutes = Math.floor(time),
     seconds = Math.floor((time - minutes) * 60);
   const current = useMemo(
@@ -46,8 +115,15 @@ export function LearningRoom() {
     setTeach(false);
     setMastery(58);
   };
+  if (isResourcesLoading) {
+    return <div className="grid min-h-screen place-items-center bg-[#111210] text-sm text-white/50">Preparing your learning room...</div>;
+  }
+  if (!activeResource) {
+    return <ResourceRequiredState topicId={topicId} topic={topic} onResourceAdded={chooseResource} onChoose={chooseRecommended} />;
+  }
   return (
     <div className="min-h-screen bg-[#111210] text-white">
+      {resourceFeedback && <div className="fixed right-5 top-5 z-50 rounded-xl bg-[#8cd5af] px-4 py-3 text-sm font-semibold text-[#111210]">✓ Added to your learning room</div>}
       <div className="mx-auto max-w-[1500px] px-4 py-4 lg:px-6">
         <header className="flex items-center gap-4 border-b border-white/10 pb-4">
           <Link
@@ -58,12 +134,13 @@ export function LearningRoom() {
           </Link>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold">
-              Linear Regression
+              {topic}
             </div>
             <div className="text-xs text-white/40">
               Supervised Learning · Learning Room
             </div>
           </div>
+          {topicResources.length > 1 && <select value={activeResource.id} onChange={(event) => setSelectedResourceId(event.target.value)} className="max-w-[210px] rounded-lg border border-white/10 bg-[#171916] px-3 py-2 text-xs text-white/70 outline-none"><option value={activeResource.id}>{activeResource.title}</option>{topicResources.filter((resource) => resource.id !== activeResource.id).map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select>}
           <div className="hidden items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs sm:flex">
             Mastery{" "}
             <span className="font-semibold text-[#8cd5af]">{mastery}%</span>
