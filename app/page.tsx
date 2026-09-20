@@ -17,7 +17,7 @@ export default function Home() {
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-black text-white">
             <BrainCircuit size={17} />
           </div>
-          learnwise
+          QnA.ai
         </Link>
         <Link
           href="/dashboard"

@@ -40,7 +40,7 @@ export function Sidebar() {
             <div className="grid h-9 w-9 place-items-center rounded-xl bg-black text-white">
               <BrainCircuit size={17} />
             </div>
-            <span>learnwise</span>
+            <span>QnA.ai</span>
           </Link>
           <button className="lg:hidden" onClick={() => setOpen(false)}>
             <X size={18} />
