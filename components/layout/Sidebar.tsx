@@ -68,14 +68,6 @@ export function Sidebar() {
           <div className="eyebrow text-neutral-400">Actions</div>
           <div className="mt-3 space-y-1">
             <Link
-              href="/add-resource"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-neutral-600 hover:bg-neutral-50"
-            >
-              <Plus size={17} />
-              Add Resource
-            </Link>
-            <Link
               href="/goals"
               onClick={() => setOpen(false)}
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-neutral-600 hover:bg-neutral-50"

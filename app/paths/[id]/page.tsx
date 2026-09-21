@@ -13,7 +13,7 @@ import { ProgressRing } from "@/components/common/ProgressRing";
 import { useAppState } from "@/lib/state";
 export default function PathDetail() {
   const { id } = useParams<{ id: string }>();
-  const { paths, isStateLoading } = useAppState();
+  const { paths, isStateLoading, mastery } = useAppState();
   const path = paths.find((item) => item.id === id);
 
   if (isStateLoading) {
@@ -39,7 +39,7 @@ export default function PathDetail() {
           <h1 className="mt-2 text-3xl font-semibold">{path.title}</h1>
           <p className="mt-1 text-neutral-500">{path.description ?? "A guided path that adapts around your understanding."}</p>
         </div>
-        <ProgressRing value={68} label="68%" />
+        <ProgressRing value={mastery} label={`${mastery}%`} />
       </header>
       <div className="mt-8 space-y-4">
         {path.modules.map((module, i) => (

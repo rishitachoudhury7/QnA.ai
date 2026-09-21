@@ -79,7 +79,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     let active = true;
     const loadResources = async () => {
       try {
-        const stored = window.localStorage.getItem("learnwise-resources");
+        const stored = window.localStorage.getItem("qna-ai-resources") ?? window.localStorage.getItem("learnwise-resources");
         if (stored) setResources(JSON.parse(stored) as LearningResource[]);
         const response = await fetch("/api/resources", { credentials: "include" });
         if (response.ok && active) {
@@ -102,6 +102,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           })));
         }
       } catch {
+        window.localStorage.removeItem("qna-ai-resources");
         window.localStorage.removeItem("learnwise-resources");
       } finally {
         if (active) setIsResourcesLoading(false);
@@ -130,7 +131,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     let active = true;
     const loadGoals = async () => {
       try {
-        const stored = window.localStorage.getItem("learnwise-goals");
+        const stored = window.localStorage.getItem("qna-ai-goals") ?? window.localStorage.getItem("learnwise-goals");
         if (stored) setGoals(JSON.parse(stored) as LearningGoal[]);
         const response = await fetch("/api/goals", { credentials: "include" });
         if (response.ok && active) {
@@ -138,6 +139,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           setGoals(remote.map((goal) => ({ id: goal.id, title: goal.title, level: goal.skill_level ?? undefined, objective: goal.objective ?? undefined })));
         }
       } catch {
+        window.localStorage.removeItem("qna-ai-goals");
         window.localStorage.removeItem("learnwise-goals");
       } finally {
         if (active) setIsStateLoading(false);
@@ -148,11 +150,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   }, [isLoaded, isSignedIn]);
   useEffect(() => {
     if (!isStateLoading) {
-      window.localStorage.setItem("learnwise-goals", JSON.stringify(goals));
+      window.localStorage.setItem("qna-ai-goals", JSON.stringify(goals));
     }
   }, [goals, isStateLoading]);
   useEffect(() => {
-    window.localStorage.setItem("learnwise-resources", JSON.stringify(resources));
+    window.localStorage.setItem("qna-ai-resources", JSON.stringify(resources));
   }, [resources]);
   const saveGoal = async (input: Omit<LearningGoal, "id">) => {
     if (!isLoaded || !isSignedIn) return { authRequired: true };
