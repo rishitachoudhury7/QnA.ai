@@ -2,6 +2,10 @@
 
 Apply `migrations/001_initial_learning_schema.sql` to the Supabase project whose URL is in `.env.local`, using the Supabase Dashboard SQL Editor. The application cannot create tables through the REST API. After running the migration, retry the goal creation request. Optionally apply `seed.sql` in a development project.
 
+For YouTube ingestion, also apply `migrations/002_content_embeddings.sql`. It enables pgvector and adds `video_segments.embedding` with the 768-dimension Gemini embedding type. If PostgREST reports an error that the embedding column does not exist, apply this migration and run the schema-cache reload below.
+
+For timestamp-aware tutor retrieval, apply `migrations/003_tutor_retrieval.sql`. It adds the `match_video_segments` RPC used for semantic vector search. The tutor combines those results with timestamp-overlapping segments before generating an answer.
+
 If PostgREST still reports `PGRST205` immediately after applying the migration, wait briefly and reload the schema cache from the SQL Editor:
 
 ```sql

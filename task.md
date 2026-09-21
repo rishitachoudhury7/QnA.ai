@@ -20,30 +20,29 @@
 - [x] ✅ Goal creation loading/error states and generated dashboard path
 
 ## PHASE 2: YouTube Ingestion & Content Engine
-- [ ] Implement background processing flow (`PROCESSING` -> `READY`)
-- [ ] Implement YouTube Metadata & Transcript fetching
-- [ ] Implement Temporal & Semantic Chunking
-- [ ] Implement `lib/ai/content/embeddings.ts` (Gemini embeddings -> pgvector)
+- [x] ✅ Implement background processing flow (`PROCESSING` -> `READY`)
+- [x] ✅ Implement YouTube Metadata & Transcript fetching
+- [x] ✅ Implement Temporal & Semantic Chunking
+- [x] ✅ Implement `lib/ai/content/embeddings.ts` (Gemini embeddings -> pgvector)
 
 ## PHASE 3: AI Knowledge Engine
-- [ ] Implement `lib/ai/content/conceptExtractor.ts` (Gemini structured concepts)
-- [ ] Implement Zod validation (`ConceptSchema`) and retry logic
-- [ ] Implement concept deduplication and relationship building
-- [ ] Persist concepts and relationships to DB
+- [x] ✅ Implement `lib/ai/content/conceptExtractor.ts` (Gemini structured concepts)
+- [x] ✅ Implement Zod validation (`ConceptSchema`) and retry logic
+- [x] ✅ Implement concept deduplication and relationship building
+- [x] ✅ Persist concepts and relationships to DB
 
 ## PHASE 4: Timestamp-Aware Tutor
 - [x] ✅ Build `app/learn/[resourceId]/page.tsx`
-- [ ] Build `components/video/YouTubePlayer.tsx` (YouTube IFrame API integration)
-- [ ] Implement temporal + semantic retrieval strategy
-- [ ] Implement `lib/ai/content/tutor.ts` with explicit Grounding Rules
+- [x] ✅ Build `components/video/YouTubePlayer.tsx` (YouTube IFrame API integration)
+- [x] ✅ Implement temporal + semantic retrieval strategy
+- [x] ✅ Implement `lib/ai/content/tutor.ts` with explicit Grounding Rules
 
 ## PHASE 5: Learner Engine & Mastery Model
 - [x] ✅ Define Evidence-Based Mastery model (Observation, Assessment, Explanation)
 - [x] ✅ Interactive Quick Check & Teach-Back evaluation UI
-- [ ] Implement `lib/ai/learner/assessment.ts` (Quick Checks / Zod validated)
-- [ ] Implement `lib/ai/learner/misconception.ts` (Teach-back evaluation)
-- [ ] Track and update `student_concept_mastery` and `learning_interactions`
-
+- [x] ✅ Implement `lib/ai/learner/assessment.ts` (Quick Checks / Zod validated)
+- [x] ✅ Implement `lib/ai/learner/misconception.ts` (Teach-back evaluation)
+- [x] ✅ Track and update `student_concept_mastery` and `learning_interactions`
 ## PHASE 6: Knowledge Map
 - [x] ✅ Build `app/knowledge-map/page.tsx`
 - [x] ✅ Implement `components/graph/KnowledgeGraph.tsx` (React Flow / @xyflow/react in `components/knowledge/KnowledgeMap.tsx`)

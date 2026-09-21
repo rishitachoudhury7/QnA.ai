@@ -1,15 +1,29 @@
+"use client";
+
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
-  CheckCircle2,
-  CircleAlert,
   LockKeyhole,
+  PlayCircle,
 } from "lucide-react";
-import { pathModules } from "@/lib/mock-data";
 import { ProgressRing } from "@/components/common/ProgressRing";
+import { useAppState } from "@/lib/state";
 export default function PathDetail() {
+  const { id } = useParams<{ id: string }>();
+  const { paths, isStateLoading } = useAppState();
+  const path = paths.find((item) => item.id === id);
+
+  if (isStateLoading) {
+    return <div className="grid min-h-[70vh] place-items-center px-6 text-sm text-neutral-500">Loading your learning path...</div>;
+  }
+
+  if (!path) {
+    return <div className="mx-auto max-w-6xl px-6 py-8 lg:px-10"><Link href="/paths" className="text-sm text-neutral-500">Back to learning paths</Link><p className="mt-8 text-neutral-500">That learning path could not be found.</p></div>;
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-8 lg:px-10">
       <Link
@@ -21,80 +35,50 @@ export default function PathDetail() {
       </Link>
       <header className="mt-7 flex items-end justify-between gap-6">
         <div>
-          <div className="eyebrow text-neutral-400">Machine Learning</div>
-          <h1 className="mt-2 text-3xl font-semibold">
-            Beginner → Intermediate
-          </h1>
-          <p className="mt-1 text-neutral-500">
-            A guided path that adapts around your understanding.
-          </p>
+          <div className="eyebrow text-neutral-400">Learning path</div>
+          <h1 className="mt-2 text-3xl font-semibold">{path.title}</h1>
+          <p className="mt-1 text-neutral-500">{path.description ?? "A guided path that adapts around your understanding."}</p>
         </div>
         <ProgressRing value={68} label="68%" />
       </header>
       <div className="mt-8 space-y-4">
-        {pathModules.map((m, i) => (
+        {path.modules.map((module, i) => (
           <section
-            key={m.n}
-            className={`surface p-5 ${i === 3 ? "ring-1 ring-[#dcebe4]" : ""}`}
+            key={module.id}
+            className={`surface p-5 ${i === 0 ? "ring-1 ring-[#dcebe4]" : ""}`}
           >
             <div className="flex items-center gap-4">
               <div className="grid h-10 w-10 place-items-center rounded-full bg-neutral-100 font-semibold text-sm">
-                {m.s === "Completed" ? (
-                  <CheckCircle2 size={18} className="text-[var(--accent)]" />
-                ) : m.s === "Locked" ? (
-                  <LockKeyhole size={16} className="text-neutral-400" />
+                {i === 0 ? (
+                  <PlayCircle size={18} className="text-[var(--accent)]" />
                 ) : (
-                  m.n
+                  <LockKeyhole size={16} className="text-neutral-400" />
                 )}
               </div>
               <div className="flex-1">
-                <div className="text-xs text-neutral-400">Module {m.n}</div>
-                <h2 className="font-semibold">{m.t}</h2>
+                <div className="text-xs text-neutral-400">Module {i + 1}</div>
+                <h2 className="font-semibold">{module.title}</h2>
               </div>
-              <div className="text-sm text-neutral-500">{m.s}</div>
-              {i === 3 && (
-                <Link
-                  href="/learn/linear-regression"
-                  className="hidden rounded-xl bg-black px-3 py-2 text-xs font-semibold text-white sm:block"
-                >
-                  Open
-                </Link>
-              )}
+              <div className="text-sm text-neutral-500">{i === 0 ? "In Progress" : "Upcoming"}</div>
             </div>
-            {(i === 1 || i === 3) && (
+            {module.description || module.topics.length > 0 ? (
               <div className="mt-5 border-t border-[var(--line)] pt-5">
-                <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-400">
-                  Topics
-                </div>
+                {module.description && <p className="mb-4 text-sm text-neutral-500">{module.description}</p>}
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Link
-                    href="/learn/linear-regression"
-                    className="rounded-xl border border-[var(--line)] p-4 hover:bg-neutral-50"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">Linear Regression</span>
-                      <span className="text-xs text-[var(--accent)]">72%</span>
-                    </div>
-                    <div className="mt-2 text-xs text-neutral-500">
-                      Features · Labels · Cost Function · Gradient Descent
-                    </div>
-                    <div className="mt-3 flex items-center gap-3 text-xs text-neutral-400">
-                      <BookOpen size={13} />2 resources{" "}
-                      <CircleAlert size={13} className="text-[#c74a4a]" />1
-                      needs attention
-                    </div>
-                  </Link>
-                  <div className="rounded-xl border border-dashed border-[var(--line)] p-4">
-                    <div className="font-medium text-neutral-400">
-                      Classification
-                    </div>
-                    <div className="mt-1 text-xs text-neutral-400">
-                      Unlocks after Linear Regression mastery improves.
-                    </div>
-                  </div>
+                  {module.topics.map((topic) => (
+                    <Link key={topic.id} href={`/learn/${topic.id}`} className="rounded-xl border border-[var(--line)] p-4 hover:bg-neutral-50">
+                      <div className="flex items-start gap-3">
+                        <BookOpen size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+                        <div>
+                          <div className="font-medium">{topic.title}</div>
+                          {topic.description && <div className="mt-2 text-xs leading-5 text-neutral-500">{topic.description}</div>}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
                 </div>
               </div>
-            )}
+            ) : null}
           </section>
         ))}
       </div>

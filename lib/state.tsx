@@ -27,6 +27,12 @@ export type LearningResource = {
   duration?: string;
   timestamp?: string;
   source?: string;
+  status?: "pending" | "processing" | "ready" | "failed";
+  error?: string;
+  knowledgeStatus?: "completed";
+  knowledgeConcepts?: number;
+  knowledgeRelationships?: number;
+  knowledgeError?: string;
 };
 
 type Ctx = {
@@ -39,6 +45,8 @@ type Ctx = {
     resource: Omit<LearningResource, "id"> | string,
     topicId?: string,
   ) => LearningResource;
+  createResource: (resource: Omit<LearningResource, "id" | "status">) => Promise<LearningResource | null>;
+  updateResource: (id: string, updates: Partial<LearningResource>) => void;
   resources: LearningResource[];
   getResourcesForTopic: (topicId: string) => LearningResource[];
   isResourcesLoading: boolean;
@@ -75,7 +83,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         if (stored) setResources(JSON.parse(stored) as LearningResource[]);
         const response = await fetch("/api/resources", { credentials: "include" });
         if (response.ok && active) {
-          const remote = (await response.json()) as Array<{ id: string; topic_id: string | null; type: LearningResource["type"]; title: string; url: string | null; duration_seconds: number | null; metadata: Record<string, unknown> }>;
+          const remote = (await response.json()) as Array<{ id: string; topic_id: string | null; type: LearningResource["type"]; title: string; url: string | null; duration_seconds: number | null; status: LearningResource["status"]; metadata: Record<string, unknown> }>;
           setResources(remote.map((resource) => ({
             id: resource.id,
             topicId: resource.topic_id,
@@ -85,6 +93,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             duration: resource.duration_seconds ? `${Math.round(resource.duration_seconds / 60)} min` : undefined,
             timestamp: typeof resource.metadata.timestamp === "string" ? resource.metadata.timestamp : undefined,
             source: typeof resource.metadata.source === "string" ? resource.metadata.source : undefined,
+            status: resource.status,
+            error: typeof resource.metadata.ingestionError === "string" ? resource.metadata.ingestionError : undefined,
+            knowledgeStatus: resource.metadata.knowledgeStatus === "completed" ? "completed" : undefined,
+            knowledgeConcepts: typeof resource.metadata.knowledgeConcepts === "number" ? resource.metadata.knowledgeConcepts : undefined,
+            knowledgeRelationships: typeof resource.metadata.knowledgeRelationships === "number" ? resource.metadata.knowledgeRelationships : undefined,
+            knowledgeError: typeof resource.metadata.knowledgeError === "string" ? resource.metadata.knowledgeError : undefined,
           })));
         }
       } catch {
@@ -187,7 +201,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             title: input.trim(),
             url: input.trim(),
           }
-        : { ...input, id: crypto.randomUUID() };
+        : { ...input, id: crypto.randomUUID(), status: "ready" };
     if (!resource.title.trim()) return resource;
     setResources((current) => [resource, ...current]);
     void fetch("/api/resources", {
@@ -209,6 +223,32 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setRecommendation("Continue with your newly added resource");
     return resource;
   };
+  const createResource = async (input: Omit<LearningResource, "id" | "status">) => {
+    try {
+      const response = await fetch("/api/resources", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topicId: input.topicId,
+          type: input.type,
+          title: input.title,
+          url: input.url,
+          metadata: { timestamp: input.timestamp, source: input.source },
+        }),
+      });
+      if (!response.ok) return null;
+      const saved = await response.json() as { id: string; topic_id: string | null; type: LearningResource["type"]; title: string; url: string | null; status: LearningResource["status"] };
+      const resource = { ...input, id: saved.id, topicId: saved.topic_id, status: saved.status };
+      setResources((current) => [resource, ...current.filter((item) => item.id !== resource.id)]);
+      return resource;
+    } catch {
+      return null;
+    }
+  };
+  const updateResource = (id: string, updates: Partial<LearningResource>) => {
+    setResources((current) => current.map((resource) => resource.id === id ? { ...resource, ...updates } : resource));
+  };
   const getResourcesForTopic = useCallback(
     (topicId: string) => resources.filter((resource) => resource.topicId === topicId),
     [resources],
@@ -221,6 +261,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       setShowTutor,
       recommendation,
       addResource,
+      createResource,
+      updateResource,
       resources,
       getResourcesForTopic,
       isResourcesLoading,
