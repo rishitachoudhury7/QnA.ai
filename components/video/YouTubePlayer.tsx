@@ -9,7 +9,7 @@ export type YouTubePlayerProps = {
   onSeekReady?: (seek: (seconds: number) => void) => void;
 };
 
-type YouTubePlayerInstance = { getCurrentTime: () => number; seekTo: (seconds: number, allowSeekAhead: boolean) => void; playVideo: () => void; pauseVideo: () => void };
+type YouTubePlayerInstance = { getCurrentTime: () => number; seekTo: (seconds: number, allowSeekAhead: boolean) => void; playVideo: () => void; pauseVideo: () => void; destroy: () => void };
 type YouTubeNamespace = { Player: new (element: HTMLElement, options: { videoId: string; playerVars?: Record<string, number>; events?: { onReady?: (event: { target: YouTubePlayerInstance }) => void } }) => YouTubePlayerInstance };
 
 declare global { interface Window { YT?: YouTubeNamespace; onYouTubeIframeAPIReady?: () => void; } }
@@ -34,6 +34,7 @@ export function YouTubePlayer({ url, onTimeChange, onSeekReady }: YouTubePlayerP
   const videoId = videoIdFromUrl(url);
 
   useEffect(() => {
+    setIsReady(false);
     if (!videoId || !mountRef.current) return;
     let cancelled = false;
     const createPlayer = () => {
@@ -47,12 +48,12 @@ export function YouTubePlayer({ url, onTimeChange, onSeekReady }: YouTubePlayerP
       const script = document.querySelector('script[src="https://www.youtube.com/iframe_api"]') ?? document.createElement("script");
       if (!script.parentNode) { script.setAttribute("src", "https://www.youtube.com/iframe_api"); document.head.appendChild(script); }
     }
-    return () => { cancelled = true; playerRef.current = null; };
+    return () => { cancelled = true; playerRef.current?.destroy?.(); playerRef.current = null; };
   }, [videoId, onSeekReady]);
 
   useEffect(() => {
     if (!isReady || !playerRef.current) return;
-    const interval = window.setInterval(() => { if (playerRef.current) onTimeChange(playerRef.current.getCurrentTime()); }, 500);
+    const interval = window.setInterval(() => { if (playerRef.current && typeof playerRef.current.getCurrentTime === "function") onTimeChange(playerRef.current.getCurrentTime()); }, 500);
     return () => window.clearInterval(interval);
   }, [isReady, onTimeChange]);
 

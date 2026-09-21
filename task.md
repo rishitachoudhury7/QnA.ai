@@ -40,9 +40,9 @@
 ## PHASE 5: Learner Engine & Mastery Model
 - [x] ✅ Define Evidence-Based Mastery model (Observation, Assessment, Explanation)
 - [x] ✅ Interactive Quick Check & Teach-Back evaluation UI
-- [ ] Implement `lib/ai/learner/assessment.ts` (Quick Checks / Zod validated)
-- [ ] Implement `lib/ai/learner/misconception.ts` (Teach-back evaluation)
-- [ ] Track and update `student_concept_mastery` and `learning_interactions`
+- [x] ✅ Implement `lib/ai/learner/assessment.ts` (Quick Checks / Zod validated)
+- [x] ✅ Implement `lib/ai/learner/misconception.ts` (Teach-back evaluation)
+- [x] ✅ Track and update `student_concept_mastery` and `learning_interactions`
 ## PHASE 6: Knowledge Map
 - [x] ✅ Build `app/knowledge-map/page.tsx`
 - [x] ✅ Implement `components/graph/KnowledgeGraph.tsx` (React Flow / @xyflow/react in `components/knowledge/KnowledgeMap.tsx`)
