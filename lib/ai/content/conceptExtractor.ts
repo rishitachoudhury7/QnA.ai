@@ -4,34 +4,46 @@ import { ExtractionSchema, RelationshipsSchema, type ExtractedConcept, type Extr
 export type ConceptSourceSegment = { id: string; startSeconds: number; endSeconds: number; text: string };
 
 const configuredModel = process.env.GEMINI_CONCEPT_MODEL;
-const models = [...new Set([configuredModel, "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"].filter((value): value is string => Boolean(value)))];
+const models = [...new Set([configuredModel, "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-3.1-flash-lite"].filter((value): value is string => Boolean(value)))];
+
+const transientStatuses = new Set([429, 500, 502, 503, 504]);
+
+function retryDelay(attempt: number): number {
+  return 500 * 2 ** attempt;
+}
 
 async function askGemini(prompt: string): Promise<unknown> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
   let lastStatus = 0;
   for (const model of models) {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.1, responseMimeType: "application/json" },
-      }),
-    });
-    if (!response.ok) {
-      lastStatus = response.status;
-      console.warn("Phase 3 Gemini request failed", { model, status: response.status });
-      continue;
-    }
-    const payload = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) continue;
-    try {
-      console.info("Phase 3 Gemini request succeeded", { model });
-      return JSON.parse(text);
-    } catch {
-      throw new Error("GEMINI_MALFORMED_OUTPUT");
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.1, responseMimeType: "application/json" },
+        }),
+      });
+      if (!response.ok) {
+        lastStatus = response.status;
+        console.warn("Phase 3 Gemini request failed", { model, status: response.status, attempt: attempt + 1 });
+        if (transientStatuses.has(response.status) && attempt === 0) {
+          await new Promise((resolve) => setTimeout(resolve, retryDelay(attempt)));
+          continue;
+        }
+        break;
+      }
+      const payload = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+      const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) break;
+      try {
+        console.info("Phase 3 Gemini request succeeded", { model });
+        return JSON.parse(text);
+      } catch {
+        throw new Error("GEMINI_MALFORMED_OUTPUT");
+      }
     }
   }
   throw new Error(`GEMINI_EXTRACTION_ERROR_${lastStatus || "UNKNOWN"}`);

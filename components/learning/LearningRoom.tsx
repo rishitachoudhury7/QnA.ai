@@ -12,6 +12,7 @@ import {
   Sparkles,
   X,
   Plus,
+  ClipboardList,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddResource } from "@/components/resources/AddResource";
@@ -172,6 +173,15 @@ export function LearningRoom() {
   const [tutorMessages, setTutorMessages] = useState<TutorMessage[]>([]);
   const [isTutorLoading, setIsTutorLoading] = useState(false);
   const [tutorError, setTutorError] = useState<string | null>(null);
+  
+  // Assignment state
+  const [assignment, setAssignment] = useState(false);
+  const [assignmentChecks, setAssignmentChecks] = useState<QuickCheckState[] | null>(null);
+  const [assignmentAnswers, setAssignmentAnswers] = useState<Record<number, number>>({});
+  const [isAssignmentLoading, setIsAssignmentLoading] = useState(false);
+  const [assignmentResult, setAssignmentResult] = useState<{ isCorrect: boolean; score: number } | null>(null);
+  const [completedQuickChecks, setCompletedQuickChecks] = useState<Set<string>>(new Set());
+
   const seekPlayerRef = useRef<(seconds: number) => void>(() => undefined);
   const lastWatchedBucketRef = useRef(0);
   useEffect(() => {
@@ -257,9 +267,64 @@ export function LearningRoom() {
       setQuickResult(null);
       setLearnerError(null);
     } else {
+      if (currentConcept) {
+        setCompletedQuickChecks((prev) => new Set(prev).add(currentConcept.id));
+      }
       setQuick(false);
     }
   };
+
+  const prefetchAssignment = useCallback(async () => {
+    if (assignmentChecks || isAssignmentLoading) return;
+    setIsAssignmentLoading(true);
+    try {
+      const response = await fetch(`/api/resources/${activeResource?.id}/assignment`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conceptId: currentConcept?.id }) });
+      const payload = await response.json() as { assignments?: Array<{ question: string; options: string[]; correctAnswer: string; explanation: string }>; assessments?: Array<{ id: string }>; concept?: { id: string; name: string }; error?: string };
+      if (!response.ok || !payload.assignments || !payload.assessments || !payload.concept) throw new Error(payload.error ?? "Could not create Assignment");
+      setAssignmentChecks(payload.assignments.map((qc, i) => ({ ...qc, assessmentId: payload.assessments![i].id, conceptId: payload.concept!.id, conceptName: payload.concept!.name })));
+    } catch (error) { console.error("Prefetch assignment error", error); }
+    finally { setIsAssignmentLoading(false); }
+  }, [activeResource?.id, currentConcept?.id, assignmentChecks, isAssignmentLoading]);
+
+  useEffect(() => {
+    let active = true;
+    if (currentMastery >= 50 && !assignmentChecks && !isAssignmentLoading && activeResource?.id && currentConcept?.id) {
+       setTimeout(() => {
+         if (active) void prefetchAssignment();
+       }, 0);
+    }
+    return () => { active = false; };
+  }, [currentMastery, assignmentChecks, isAssignmentLoading, activeResource?.id, currentConcept?.id, prefetchAssignment]);
+
+  const openAssignment = async () => {
+    setAssignment(true);
+    setAssignmentAnswers({});
+    setAssignmentResult(null);
+    setLearnerError(null);
+    if (!assignmentChecks) {
+       await prefetchAssignment();
+    }
+  };
+
+  const submitAssignment = async () => {
+    if (!assignmentChecks || Object.keys(assignmentAnswers).length < assignmentChecks.length) {
+      setLearnerError("Please answer all questions before submitting.");
+      return;
+    }
+    setLearnerError(null);
+    try {
+      const answersList = assignmentChecks.map((check, index) => ({
+        assessmentId: check.assessmentId,
+        answer: check.options[assignmentAnswers[index]]
+      }));
+      const response = await fetch(`/api/resources/${activeResource.id}/assignment/attempt`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answers: answersList, conceptId: currentConcept?.id }) });
+      const payload = await response.json() as { isCorrect?: boolean; score?: number; mastery?: { mastery_score: number }; error?: string };
+      if (!response.ok || typeof payload.isCorrect !== "boolean") throw new Error(payload.error ?? "Could not submit Assignment");
+      setAssignmentResult({ isCorrect: payload.isCorrect, score: payload.score ?? 0 });
+      setMastery(Number(payload.mastery?.mastery_score ?? mastery));
+    } catch (error) { setLearnerError(error instanceof Error ? error.message : "Could not submit Assignment"); }
+  };
+
   const submitTeach = async () => {
     if (!explanation.trim() || isTeachSubmitting) return;
     setIsTeachSubmitting(true);
@@ -383,7 +448,7 @@ export function LearningRoom() {
                 </div>
               </div>
               {currentConcept && <div className="mt-4 flex flex-wrap gap-4 text-[11px] text-white/40"><span>Evidence: {currentConcept.evidenceCount}</span><span>Confidence: {currentConcept.confidence}%</span>{currentConcept.lastAssessedAt && <span>Assessed {new Date(currentConcept.lastAssessedAt).toLocaleDateString()}</span>}</div>}
-              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <div className="mt-4 grid gap-2 sm:grid-cols-4">
                 <button
                   onClick={() => setQuestion("What is happening at this moment?")}
                   className="rounded-xl border border-white/10 px-3 py-3 text-left text-xs font-semibold hover:bg-white/5"
@@ -393,11 +458,11 @@ export function LearningRoom() {
                 </button>
                 <button
                   onClick={() => void openQuickCheck()}
-                  disabled={!currentConcept || isLearningContextLoading}
+                  disabled={!currentConcept || isLearningContextLoading || (currentConcept && completedQuickChecks.has(currentConcept.id)) as boolean}
                   className="rounded-xl border border-white/10 px-3 py-3 text-left text-xs font-semibold hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  <Check size={14} className="mb-2 text-[#c9a338]" />
-                  Quick Check
+                  <Check size={14} className={`mb-2 ${(currentConcept && completedQuickChecks.has(currentConcept.id)) ? "text-[#8cd5af]" : "text-[#c9a338]"}`} />
+                  {(currentConcept && completedQuickChecks.has(currentConcept.id)) ? "Quick Check Done" : "Quick Check"}
                 </button>
                 <button
                   onClick={() => { setTeachResult(null); setLearnerError(null); setTeach(true); }}
@@ -406,6 +471,14 @@ export function LearningRoom() {
                 >
                   <Mic size={14} className="mb-2 text-[#9ab0ff]" />
                   Teach Back
+                </button>
+                <button
+                  onClick={() => void openAssignment()}
+                  disabled={!currentConcept || isLearningContextLoading || currentMastery < 75}
+                  className="rounded-xl border border-white/10 px-3 py-3 text-left text-xs font-semibold hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ClipboardList size={14} className="mb-2 text-[#bcebd0]" />
+                  Assignment
                 </button>
               </div>
             </div>
@@ -526,6 +599,73 @@ export function LearningRoom() {
                 >
                   {quickChecks && quickCheckIndex < quickChecks.length - 1 ? "Next question" : "Finish"}
                 </button>
+              )}
+            </motion.div>
+          </div>
+        )}
+        {assignment && (
+          <div className="fixed inset-0 z-50 grid place-items-center overflow-auto bg-black/70 p-4 py-12 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 15 }}
+              className="w-full max-w-2xl rounded-2xl bg-white p-6 text-neutral-900 shadow-2xl"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="eyebrow text-neutral-400">Concept Assignment</div>
+                  <h2 className="mt-1 text-xl font-semibold">
+                    {isAssignmentLoading ? "Creating your assignment..." : assignmentChecks ? "Complete all questions" : "Assignment unavailable"}
+                  </h2>
+                </div>
+                <button onClick={() => setAssignment(false)}>
+                  <X size={18} />
+                </button>
+              </div>
+              
+              {assignmentChecks && assignmentResult === null && (
+                <div className="mt-5 space-y-8">
+                  {assignmentChecks.map((check, index) => (
+                    <div key={check.assessmentId} className="space-y-3">
+                      <div className="font-medium">{index + 1}. {check.question}</div>
+                      <div className="space-y-2">
+                        {check.options.map((option, optIdx) => (
+                          <button
+                            key={option}
+                            onClick={() => setAssignmentAnswers(prev => ({ ...prev, [index]: optIdx }))}
+                            className={`w-full rounded-xl border p-3 text-left text-sm ${assignmentAnswers[index] === optIdx ? "border-black bg-neutral-50" : "border-neutral-200"}`}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  {learnerError && <div className="text-sm text-red-500">{learnerError}</div>}
+                  <button
+                    onClick={() => void submitAssignment()}
+                    className="mt-6 w-full rounded-xl bg-black py-3 text-sm font-semibold text-white"
+                  >
+                    Submit Assignment
+                  </button>
+                </div>
+              )}
+
+              {assignmentResult !== null && (
+                <div className="mt-5 rounded-xl bg-[#edf6f1] p-6 text-center">
+                  <div className="text-4xl font-bold text-[#1f7a5a]">
+                    {assignmentResult.score}%
+                  </div>
+                  <div className="mt-2 font-semibold text-[#1f7a5a]">
+                    {assignmentResult.isCorrect ? "Perfect! Mastery updated to 100%." : "Good effort. Review the material and try again to reach 100% mastery."}
+                  </div>
+                  <button
+                    onClick={() => setAssignment(false)}
+                    className="mt-6 w-full rounded-xl bg-black py-3 text-sm font-semibold text-white"
+                  >
+                    Close
+                  </button>
+                </div>
               )}
             </motion.div>
           </div>
