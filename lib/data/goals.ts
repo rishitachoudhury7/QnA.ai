@@ -12,6 +12,17 @@ export async function listGoals(userId: string) {
   return (data ?? []) as LearningGoal[];
 }
 
+export async function getGoal(id: string, userId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("learning_goals")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .single();
+  if (error) throw new Error(error.message);
+  return data as LearningGoal;
+}
+
 export async function createGoal(input: Omit<LearningGoalInsert, "user_id">, userId: string) {
   const { data, error } = await supabaseAdmin
     .from("learning_goals")

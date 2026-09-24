@@ -4,12 +4,12 @@ import { ExtractionSchema, RelationshipsSchema, type ExtractedConcept, type Extr
 export type ConceptSourceSegment = { id: string; startSeconds: number; endSeconds: number; text: string };
 
 const configuredModel = process.env.GEMINI_CONCEPT_MODEL;
-const models = [...new Set([configuredModel, "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-3.1-flash-lite"].filter((value): value is string => Boolean(value)))];
+const models = [...new Set([configuredModel, "gemini-3-flash-preview", "gemini-3.6-flash", "gemini-flash-latest", "gemini-flash-lite-latest"].filter((value): value is string => Boolean(value)))];
 
 const transientStatuses = new Set([429, 500, 502, 503, 504]);
 
 function retryDelay(attempt: number): number {
-  return 500 * 2 ** attempt;
+  return 750 * 2 ** attempt;
 }
 
 async function askGemini(prompt: string): Promise<unknown> {
@@ -17,7 +17,7 @@ async function askGemini(prompt: string): Promise<unknown> {
   if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
   let lastStatus = 0;
   for (const model of models) {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -29,7 +29,7 @@ async function askGemini(prompt: string): Promise<unknown> {
       if (!response.ok) {
         lastStatus = response.status;
         console.warn("Phase 3 Gemini request failed", { model, status: response.status, attempt: attempt + 1 });
-        if (transientStatuses.has(response.status) && attempt === 0) {
+        if (transientStatuses.has(response.status) && attempt < 2) {
           await new Promise((resolve) => setTimeout(resolve, retryDelay(attempt)));
           continue;
         }

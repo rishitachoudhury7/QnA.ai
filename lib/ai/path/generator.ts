@@ -8,7 +8,7 @@ type GoalInput = {
   objective?: string | null;
 };
 
-const model = "groq/compound-mini";
+const model = "qwen/qwen3.8-27b";
 
 function promptFor(goal: GoalInput, correction?: string) {
   return `You are an expert curriculum designer. Design a structured learning path for a student.
