@@ -5,11 +5,12 @@ import { useAppState } from "@/lib/state";
 import Link from "next/link";
 
 export default function Goals() {
-  const { goals, saveGoal, updateGoal } = useAppState();
+  const { goals, paths, saveGoal, retryPath, updateGoal } = useAppState();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [retryingGoalId, setRetryingGoalId] = useState<string | null>(null);
   const createGoal = async (goal: Parameters<typeof saveGoal>[0]) => {
     setIsSubmitting(true);
     setGenerationError(null);
@@ -23,6 +24,13 @@ export default function Goals() {
     } else if (result.generationError) {
       setGenerationError("Your goal was saved, but we couldn't generate the learning path yet. Try again from this page.");
     }
+  };
+  const generatePath = async (goalId: string) => {
+    setRetryingGoalId(goalId);
+    setGenerationError(null);
+    const result = await retryPath(goalId);
+    setRetryingGoalId(null);
+    if (result.generationError) setGenerationError(result.generationError);
   };
   return (
     <div className="mx-auto max-w-3xl px-6 py-12 lg:px-10">
@@ -39,7 +47,7 @@ export default function Goals() {
         ) : (
           <div key={goal.id} className="surface flex items-center justify-between gap-4 p-6">
             <div><h2 className="text-xl font-semibold">{goal.title}</h2><p className="mt-1 text-sm capitalize text-neutral-500">{goal.level ?? "Level not set"}</p>{goal.objective && <p className="mt-2 text-sm text-neutral-500">{goal.objective}</p>}</div>
-            <div className="flex items-center gap-3"><button onClick={() => setEditingId(goal.id)} className="text-sm font-semibold underline">Edit</button><Link href="/dashboard" className="rounded-xl bg-black px-3 py-2 text-sm font-semibold text-white">Continue</Link></div>
+            <div className="flex items-center gap-3"><button onClick={() => setEditingId(goal.id)} className="text-sm font-semibold underline">Edit</button>{!paths.some((path) => path.goalId === goal.id) && <button onClick={() => void generatePath(goal.id)} disabled={retryingGoalId === goal.id} className="rounded-xl border border-[var(--line)] px-3 py-2 text-sm font-semibold disabled:opacity-50">{retryingGoalId === goal.id ? "Building..." : "Generate path"}</button>}<Link href="/dashboard" className="rounded-xl bg-black px-3 py-2 text-sm font-semibold text-white">Continue</Link></div>
           </div>
         ))}
         {!goals.length && !isAdding && <div className="surface p-8 text-center text-neutral-500">You have not created a learning goal yet.</div>}

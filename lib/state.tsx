@@ -54,6 +54,7 @@ type Ctx = {
   goals: LearningGoal[];
   isStateLoading: boolean;
   saveGoal: (goal: Omit<LearningGoal, "id">) => Promise<{ generationError?: string; authRequired?: boolean; saveFailed?: boolean }>;
+  retryPath: (goalId: string) => Promise<{ generationError?: string }>;
   updateGoal: (goal: LearningGoal) => void;
   paths: LearningPath[];
 };
@@ -190,6 +191,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify(updated),
     }).catch(() => undefined);
   };
+  const retryPath = async (goalId: string) => {
+    try {
+      const response = await fetch(`/api/goals/${goalId}`, { method: "POST", credentials: "include" });
+      const payload = await response.json() as { path?: LearningPath & { goal_id?: string }; error?: string };
+      if (!response.ok || !payload.path) return { generationError: payload.error ?? "Could not generate learning path" };
+      const generatedPath = { ...payload.path, goalId: payload.path.goal_id ?? payload.path.goalId };
+      setPaths((current) => [generatedPath, ...current.filter((path) => path.id !== generatedPath.id)]);
+      return {};
+    } catch (error) {
+      return { generationError: error instanceof Error ? error.message : "Could not generate learning path" };
+    }
+  };
   const addResource = (
     input: Omit<LearningResource, "id"> | string,
     topicId = "general",
@@ -273,6 +286,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       paths,
       isStateLoading,
       saveGoal,
+      retryPath,
       updateGoal,
     }),
     [mastery, showTutor, recommendation, resources, goals, paths, isStateLoading, isResourcesLoading, getResourcesForTopic],
